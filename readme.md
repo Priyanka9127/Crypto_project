@@ -34,7 +34,7 @@ The demonstration is in three parts:
 
 ---
 
-### 演示 Part 1: The "Secure" Baseline
+###  Part 1: The "Secure" Baseline
 
 This part shows the "secure" chat application working as intended.
 
@@ -74,7 +74,7 @@ Decrypted message from server: Hello from the server!
 
 ---
 
-### 演示 Part 2: The MITM Attack
+###  Part 2: The MITM Attack
 
 This part demonstrates the vulnerability. We will use **three terminals**.
 
@@ -125,7 +125,7 @@ MITM Attack Server listening on port 8888...
 
 ---
 
-### 演示 Part 3: The Defense
+###  Part 3: The Defense
 
 This part shows how digital signatures prevent the attack.
 
